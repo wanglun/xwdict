@@ -51,8 +51,9 @@ enyo.kind({
 	components: [
 		{kind: XwDictPlugin, name: "plugin"},
 		{kind: "PageHeader", components: [
-			{content: "", name: "result", flex: 1},
-			{kind: "Button", name: "query", caption: "Search", disabled: true, onclick: "doSearch"}]},
+            {kind: "Input", name: "word", hint: "Please input word", flex: 1},
+			{kind: "Button", name: "query", caption: "Search", disabled: false, onclick: "doSearch"}]},
+        {kind: "BasicRichText", name: "result", content: ""},
 	],
     result: "",
 	word: "test",
@@ -72,8 +73,9 @@ enyo.kind({
 	},
 	
 	doSearch: function() {
-		if (this.word !== "") {
+        if (this.word !== this.$.word.getValue()) {
+            this.word = this.$.word.getValue();
 			this.doQuery();
-		}
+        }
 	}
 });
