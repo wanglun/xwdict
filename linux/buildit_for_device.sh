@@ -10,7 +10,7 @@ export SRC="*.cpp"
 ### List the libraries needed.                                      ###
 ### LIBS="-l<libname>"                                              ###
 #######################################################################
-export LIBS="-lz -lglib-2.0"
+export LIBS="-lz -lglib-2.0 -lSDL -lpdl"
 
 #######################################################################
 ### Name your output executable                                     ###
