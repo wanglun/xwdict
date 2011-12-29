@@ -1,4 +1,5 @@
 #include <string>
+#include <syslog.h>
 
 #include "libwrapper.h"
 
@@ -35,9 +36,9 @@ static void print_search_result(FILE *out, const TSearchResult & res)
             res.exp.c_str());
 }
 
-static void output_result()
+static void output_result(TSearchResultList res_list)
 {
-    char *buffer;
+    const char *buffer;
     buffer = res_list[0].exp.c_str();
     // send data back to the JavaScript side
     syslog(LOG_WARNING, "*** returning results");
@@ -86,26 +87,28 @@ int main(int argc, char *argv[])
 
     PDL_Init(0);
 
+    /* dict dirs */
+    string data_dir = "res";
+    strlist_t dicts_dir_list;
+    dicts_dir_list.push_back(data_dir);
+
     // look for special -f switch to test getFiles from command line
     if (!PDL_IsPlugin()) {
-        RunCommandLineTests(argc, argv);
+        do_print_dict_info(dicts_dir_list);
         return 0;
     }
     else {
     }
     
     // register the js callback
-    PDL_RegisterJSHandler("getFiles", getFiles);
+    PDL_RegisterJSHandler("dictQuery", dictQuery);
     PDL_JSRegistrationComplete();
 
     // init the dict lib
-    string data_dir = "res";
-    strlist_t dicts_dir_list;
-    dicts_dir_list.push_back(data_dir);
     /* init the lib */
     Library lib;
     /* load the dicts */
-    strlist_t empty_list;
+    strlist_t empty_list, disable_list;
     lib.load(dicts_dir_list, empty_list, disable_list);
 
     // call a "ready" callback to let JavaScript know that we're initialized
@@ -126,7 +129,7 @@ int main(int argc, char *argv[])
             /* find word */
             TSearchResultList res_list;
             lib.process_phrase(query, res_list);
-            output_result(res_list[0]);
+            output_result(res_list);
 
             /* free memory since this event is processed now */
             free(query);
