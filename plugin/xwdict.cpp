@@ -9,6 +9,39 @@
 
 using std::string;
 
+/* Ouput the C string to a FILE in a fully-escaped version.  This should transparently
+ * handle UTF-8 character because the multi-byte characters always have the high bit set
+ * which means they'll by > 128.  We just pass those through.  Since it's a C string,
+ * NUL (0) terminates, and all other low control characters will be escaped either directly 
+ * or as a \uXXXX code. */
+static void fputs_json(const char *s, FILE *f) 
+{
+    unsigned int ch;
+    if (!s) return;
+
+    fputc('\"', f);
+    while ((ch = *s++) != 0) {
+        if (ch > 31 && ch != '\"' && ch != '\\') {
+            fputc(ch, f);
+        }
+        else {
+            switch (ch) {
+                /* escaping forward slash ('/') is allowed in input, 
+                   but not required on output */
+                case '\\': fputs("\\\\", f); break;
+                case '\"': fputs("\\\"", f); break;
+                case '\b': fputs("\\b", f); break;
+                case '\f': fputs("\\f", f); break;
+                case '\n': fputs("\\n", f); break;
+                case '\r': fputs("\\r", f); break;
+                case '\t': fputs("\\t", f); break;
+                default:   fprintf(f, "\\u%04x", ch); break;
+            }
+        }
+    }
+    fputc('\"', f);
+}
+
 struct PrintDictInfo {
     void operator()(const std::string& filename, bool) {
         DictInfo dict_info;
@@ -36,10 +69,26 @@ static void print_search_result(FILE *out, const TSearchResult & res)
             res.exp.c_str());
 }
 
-static void output_result(TSearchResultList res_list)
+static void output_result(TSearchResultList &res_list)
 {
-    const char *buffer;
-    buffer = res_list[0].exp.c_str();
+    char *buffer;
+    size_t bufferLength = 0;
+    // output the file listing to our memory buffer, fclose will flush changes
+    FILE *f = open_memstream(&buffer, &bufferLength);
+
+    fputs("[", f);
+    for (int i = 0; i < res_list.size(); i++) {
+        fputs("{\"dict\": ", f);
+        fputs_json(res_list[i].bookname.c_str(), f);
+        fputs(", \"word\": ", f);
+        fputs_json(res_list[i].def.c_str(), f);
+        fputs(", \"data\": ", f);
+        fputs_json(res_list[i].exp.c_str(), f);
+        fputs("},", f);
+    }
+    fputs("]", f);
+    fclose(f);
+
     // send data back to the JavaScript side
     syslog(LOG_WARNING, "*** returning results");
     PDL_Err err;
@@ -48,6 +97,9 @@ static void output_result(TSearchResultList res_list)
         syslog(LOG_ERR, "*** PDL_CallJS failed, %s", PDL_GetError());
         //SDL_Delay(5);
     }
+
+    // now that we're done, free our working memory
+    free(buffer);
 }
 
 static PDL_bool dictQuery(PDL_JSParameters *params)

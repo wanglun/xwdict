@@ -120,7 +120,6 @@ static string parse_data(const gchar *data)
             case 'g':
                 sec_size = strlen(p);
                 if(sec_size) {
-                    res+="\n";
                     m_str = g_strndup(p, sec_size);
                     res += m_str;
                     g_free(m_str);
@@ -130,7 +129,6 @@ static string parse_data(const gchar *data)
             case 'x':
                 sec_size = strlen(p);
                 if(sec_size) {
-                    res+="\n";
                     m_str = g_strndup(p, sec_size);
                     res += xdxf2text(m_str);
                     g_free(m_str);
@@ -140,7 +138,6 @@ static string parse_data(const gchar *data)
             case 't':
                 sec_size = strlen(p);
                 if(sec_size) {
-                    res+="\n";
                     m_str = g_strndup(p, sec_size);
                     res += "["+string(m_str)+"]";
                     g_free(m_str);

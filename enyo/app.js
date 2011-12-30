@@ -24,8 +24,7 @@ enyo.kind({
 		// in the order that the calls were made to do a first-in, first-out queue
 		var callback = this._resultsCallbacks.shift();
 		if (callback) {
-			//callback(enyo.json.parse(wordsJSON));
-			callback(wordsJSON);
+			callback(enyo.json.parse(wordsJSON));
 		}
 		else {
 			console.error("FileTreePlugin: got results with no callbacks registered: " + wordsJSON);
@@ -51,11 +50,10 @@ enyo.kind({
 	components: [
 		{kind: XwDictPlugin, name: "plugin"},
 		{kind: "PageHeader", components: [
-            {kind: "Input", name: "word", hint: "Please input word", flex: 1},
-			{kind: "Button", name: "query", caption: "Search", disabled: false, onclick: "doSearch"}]},
-        {kind: "BasicRichText", name: "result", content: ""},
+            {kind: "Input", name: "word", oninput: "wordChange", hint: "Please input word", flex: 1},
+			{kind: "Button", name: "search", caption: "Search", disabled: false, onclick: "doSearch"}]},
+        {name: "result", content: "", allowHtml: true},
 	],
-    result: "",
 	word: "test",
 	
 	create: function() {
@@ -68,14 +66,23 @@ enyo.kind({
 	},
 	
 	showResult: function(result) {
-        this.result = result;
-        this.$.result.setContent(this.word + ": " + result);
+        for (var i = 0; i < 2; i++) {
+            this.$.result.setContent(result[i].dict + "<br/>" + result[i].word + "<br/>" + enyo.string.escapeHtml(result[i].data));
+        }
 	},
+
+    wordChange: function() {
+        this.doSearch();
+    },
 	
 	doSearch: function() {
         if (this.word !== this.$.word.getValue()) {
             this.word = this.$.word.getValue();
-			this.doQuery();
+            if (this.$.word.isEmpty()) {
+                this.showResult('');
+            } else {
+                this.doQuery();
+            }
         }
 	}
 });
