@@ -225,7 +225,7 @@ bool Library::process_phrase(const char *loc_str, TSearchResultList &res_list)
     char *str=NULL;
     str=g_strdup(loc_str);
 
-    switch(analyze_query(str, query)) {
+    switch(Libs::analyze_query(str, query)) {
         case qtFUZZY:
             LookupWithFuzzy(query, res_list);
             break;
@@ -234,7 +234,7 @@ bool Library::process_phrase(const char *loc_str, TSearchResultList &res_list)
             break;
         case qtSIMPLE:
             SimpleLookup(str, res_list);
-            if(res_list.empty())
+            if(res_list.empty() && Libs::IsFuzzy())
                 LookupWithFuzzy(str, res_list);
             break;
         case qtDATA:

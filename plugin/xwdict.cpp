@@ -9,6 +9,9 @@
 
 using std::string;
 
+#define DICT_DIR    "res"
+static strlist_t dicts_dir_list;
+
 /* Ouput the C string to a FILE in a fully-escaped version.  This should transparently
  * handle UTF-8 character because the multi-byte characters always have the high bit set
  * which means they'll by > 128.  We just pass those through.  Since it's a C string,
@@ -42,24 +45,47 @@ static void fputs_json(const char *s, FILE *f)
     fputc('\"', f);
 }
 
+/******************** to JS Layer********************/
+// json FILE
+FILE *json_f = NULL;
+
+struct PrintDictInfo {
+	void operator()(const std::string& filename, bool) {
+		DictInfo dict_info;
+		if (dict_info.load_from_ifo_file(filename, false)) {
+            fputs("{ \"bookname\":", json_f);
+            fputs_json(dict_info.bookname.c_str(), json_f);
+            fprintf(json_f, ", \"wordcount\":%d, author:", dict_info.wordcount);
+            fputs_json(dict_info.author.c_str(), json_f);
+            fputs(", date:", json_f);
+            fputs_json(dict_info.date.c_str(), json_f);
+            fputs(", description:", json_f);
+            fputs_json(dict_info.description.c_str(), json_f);
+            fputs("},", json_f);
+		}
+	}
+};
+
 static void dict_info(Library &lib)
 {
     int i = 0;
     char *buffer;
     size_t bufferLength = 0;
     // output the file listing to our memory buffer, fclose will flush changes
-    FILE *f = open_memstream(&buffer, &bufferLength);
+    json_f = open_memstream(&buffer, &bufferLength);
 
     size_t dict_count = lib.ndicts();
 
-    fputs("[", f);
-    for (i = 0; i < dict_count; i++) {
-        fputs(" {\"bookname\": ", f);
-        fputs_json(lib.dict_name(i).c_str(), f);
-        fprintf(f, ", \"wordcount\": %d},", lib.narticles(i));
-    }
-    fputs("]", f);
-    fclose(f);
+    fputs("[", json_f);
+
+    PrintDictInfo print_dict_info;
+    strlist_t order_list, disable_list;
+    for_each_file(dicts_dir_list, ".ifo",  order_list, 
+            disable_list, print_dict_info); 
+
+    fputs("]", json_f);
+    fclose(json_f);
+    json_f = NULL;
 
     // send data back to the JavaScript side
     syslog(LOG_WARNING, "%d return dictinfo", __LINE__);
@@ -166,13 +192,15 @@ int main(int argc, char *argv[])
     PDL_Init(0);
 
     /* dict dirs */
-    string data_dir = "res";
-    strlist_t dicts_dir_list;
-    dicts_dir_list.push_back(data_dir);
+    dicts_dir_list.push_back(DICT_DIR);
 
     // init the dict lib
     /* init the lib */
     Library lib;
+    /* set configs */
+    lib.SetFuzzy(true);
+    lib.SetRegex(false);
+    lib.SetData(false);
     /* load the dicts */
     strlist_t empty_list, disable_list;
     lib.load(dicts_dir_list, empty_list, disable_list);

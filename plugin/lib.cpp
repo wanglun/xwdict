@@ -1657,37 +1657,45 @@ bool Libs::LookupData(const gchar *sWord, std::vector<gchar *> *reslist)
 }
 
 /**************************************************/
-query_t analyze_query(const char *s, std::string& res)
+query_t Libs::analyze_query(const char *s, std::string& res)
 {
+    if (config.fuzzy_lookup == false && 
+            config.regex_lookup == false &&
+            config.data_lookup == false) {
+        return qtSIMPLE;
+    }
+
     if(!s || !*s) {
         res="";
         return qtSIMPLE;
     }
-    if(*s=='/') {
+    if(*s=='/' && config.fuzzy_lookup) {
         res=s+1;
         return qtFUZZY;
     }
 
-    if(*s=='|') {
+    if(*s=='|' && config.data_lookup) {
         res=s+1;
         return qtDATA;
     }
 
-    bool regexp=false;
-    const char *p=s;
-    res="";
-    for(; *p; res+=*p, ++p) {
-        if(*p=='\\') {
-            ++p;
-            if(!*p)
-                break;
-            continue;
+    if (config.regex_lookup) {
+        bool regexp=false;
+        const char *p=s;
+        res="";
+        for(; *p; res+=*p, ++p) {
+            if(*p=='\\') {
+                ++p;
+                if(!*p)
+                    break;
+                continue;
+            }
+            if(*p=='*' || *p=='?')
+                regexp=true;
         }
-        if(*p=='*' || *p=='?')
-            regexp=true;
+        if(regexp)
+            return qtREGEXP;
     }
-    if(regexp)
-        return qtREGEXP;
 
     return qtSIMPLE;
 }

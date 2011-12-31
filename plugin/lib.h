@@ -23,6 +23,16 @@ struct cacheItem {
 const int WORDDATA_CACHE_NUM = 10;
 const int INVALID_INDEX=-100;
 
+// this structure contain all configs
+struct LibConfig {
+    // enable fuzzy
+    gchar fuzzy_lookup;
+    // enable regex
+    gchar regex_lookup;
+    // enable data
+    gchar data_lookup;
+};
+
 class DictBase
 {
 public:
@@ -104,6 +114,10 @@ public:
 
 typedef std::list<std::string> strlist_t;
 
+typedef enum {
+    qtSIMPLE, qtREGEXP, qtFUZZY, qtDATA
+} query_t;
+
 class Libs
 {
 public:
@@ -144,17 +158,32 @@ public:
     bool LookupWithFuzzy(const gchar *sWord, gchar *reslist[], gint reslist_size);
     gint LookupWithRule(const gchar *sWord, gchar *reslist[]);
     bool LookupData(const gchar *sWord, std::vector<gchar *> *reslist);
+
+    query_t analyze_query(const char *s, std::string& res);
+    // for configs
+    void SetFuzzy(bool enable) {
+        config.fuzzy_lookup = enable;
+    }
+    bool IsFuzzy() {
+        return config.fuzzy_lookup;
+    }
+    void SetRegex(bool enable) {
+        config.regex_lookup = enable;
+    }
+    bool IsRegex() {
+        return config.regex_lookup;
+    }
+    void SetData(bool enable) {
+        config.data_lookup = enable;
+    }
+    bool IsData() {
+        return config.data_lookup;
+    }
 private:
     std::vector<Dict *> oLib; // word Libs.
     int iMaxFuzzyDistance;
     progress_func_t progress_func;
+    LibConfig config;
 };
-
-
-typedef enum {
-    qtSIMPLE, qtREGEXP, qtFUZZY, qtDATA
-} query_t;
-
-extern query_t analyze_query(const char *s, std::string& res);
 
 #endif//!__SD_LIB_H__
