@@ -1,0 +1,18 @@
+.search-input {
+    border: none;
+}
+.search-input-focus {
+}
+.search-input-input {
+    display: block
+    margin-top: -15px;
+}
+.enyo-header {
+    height: 30px;
+    min-height: 30px;
+}
+.enyo-header-inner {
+    min-height: 30px;
+    padding: 2px;
+    padding-left: 10px;
+}

@@ -15,6 +15,7 @@ enyo.kind({
 		// we create this as a deferred callback so we can call back into the
 		// plugin immediately
 		this.addCallback("dictQueryResult", enyo.bind(this, this._queryResultsCallback), true);
+		this.addCallback("dictInfoResult", enyo.bind(this, this._infoResultsCallback), true);
 	},
 	
 	_resultsCallbacks: [],
@@ -30,12 +31,38 @@ enyo.kind({
 			console.error("FileTreePlugin: got results with no callbacks registered: " + wordsJSON);
 		}
 	},
+
+    _infoCallback: 0,
+	_infoResultsCallback: function(wordsJSON) {
+		console.error("plugin: dictinfo " + wordsJSON);
+		// we rely on the fact that calls to the plugin will result in callbacks happening
+		// in the order that the calls were made to do a first-in, first-out queue
+		if (this._infoCallback) {
+			//this._infoCallback(enyo.json.parse(wordsJSON));
+			this._infoCallback(wordsJSON);
+		}
+		else {
+			console.error("FileTreePlugin: got results with no callbacks registered: " + wordsJSON);
+		}
+	},
 	
 	dictQuery: function(query, callback) {
 		if (window.PalmSystem) {
-			console.error("***** FileTreePlugin: getFiles");
+			console.error("plugin: dictQuery");
 			this._resultsCallbacks.push(callback);
 			this.callPluginMethodDeferred(enyo.nop, "dictQuery", query);
+		}
+		else {
+			// if not on device, return mock data
+			enyo.nextTick(this, function() { callback("test result"); });
+		}
+	},
+
+	dictInfo: function(callback) {
+		if (window.PalmSystem) {
+			console.error("plugin: dictInfo");
+			this._infoCallback = callback;
+			this.callPluginMethodDeferred(enyo.nop, "dictInfo");
 		}
 		else {
 			// if not on device, return mock data
@@ -49,16 +76,26 @@ enyo.kind({
 	kind: "VFlexBox",
 	components: [
 		{kind: XwDictPlugin, name: "plugin"},
-		{kind: "PageHeader", components: [
-            {kind: "Input", name: "word", oninput: "wordChange", hint: "Please input word", flex: 1},
-			{kind: "Button", name: "search", caption: "Search", disabled: false, onclick: "doSearch"}]},
-        {name: "result", content: "", allowHtml: true},
+		{kind: "PageHeader",
+            components: [
+            {kind: "Input", name: "word", className: "search-input", inputClassName: "search-input-input", focusClassName: "search-input-focus", oninput: "wordChange", hint: "Please input word", flex: 1},
+			]
+        },
+        {kind: "Scroller", flex: 1, components: [
+            {name: "result", content: "", allowHtml: true}]}
 	],
-	word: "test",
+	word: "",
+    dicts: "",
 	
 	create: function() {
 		this.inherited(arguments);
-		this.doQuery();
+        this.$.plugin.dictInfo(enyo.bind(this, 
+                function(info) {
+                    this.dicts = info;
+                    console.error("dictInfo: " + this.dicts);
+                    this.$.result.setContent(this.dicts);
+                }
+                ));
 	},
 	
 	doQuery: function() {
@@ -66,9 +103,11 @@ enyo.kind({
 	},
 	
 	showResult: function(result) {
-        for (var i = 0; i < 2; i++) {
-            this.$.result.setContent(result[i].dict + "<br/>" + result[i].word + "<br/>" + enyo.string.escapeHtml(result[i].data));
+        var output_result = "";
+        for (var i = 0; i < result.length; i++) {
+            output_result += result[i].dict + "<br/>" + result[i].word + "<br/>" + enyo.string.escapeHtml(result[i].data);
         }
+        this.$.result.setContent(output_result);
 	},
 
     wordChange: function() {

@@ -42,34 +42,39 @@ static void fputs_json(const char *s, FILE *f)
     fputc('\"', f);
 }
 
-struct PrintDictInfo {
-    void operator()(const std::string& filename, bool) {
-        DictInfo dict_info;
-        if(dict_info.load_from_ifo_file(filename, false)) {
-            string bookname = dict_info.bookname;
-            printf("%s    %d\n", bookname.c_str(), dict_info.wordcount);
-        }
-    }
-};
-
-static void do_print_dict_info(strlist_t dicts_dir_list) {
-    /* print dicts info */
-    PrintDictInfo print_dict_info;
-    strlist_t order_list, disable_list;
-    for_each_file(dicts_dir_list, ".ifo",  order_list,
-                  disable_list, print_dict_info);
-}
-
-static void print_search_result(FILE *out, const TSearchResult & res)
+static void dict_info(Library &lib)
 {
-    string loc_bookname, loc_def, loc_exp;
-    fprintf(out, "-->%s\n-->%s\n%s\n\n",
-            res.bookname.c_str(),
-            res.def.c_str(),
-            res.exp.c_str());
+    int i = 0;
+    char *buffer;
+    size_t bufferLength = 0;
+    // output the file listing to our memory buffer, fclose will flush changes
+    FILE *f = open_memstream(&buffer, &bufferLength);
+
+    size_t dict_count = lib.ndicts();
+
+    fputs("[", f);
+    for (i = 0; i < dict_count; i++) {
+        fputs(" {\"bookname\": ", f);
+        fputs_json(lib.dict_name(i).c_str(), f);
+        fprintf(f, ", \"wordcount\": %d},", lib.narticles(i));
+    }
+    fputs("]", f);
+    fclose(f);
+
+    // send data back to the JavaScript side
+    syslog(LOG_WARNING, "%d return dictinfo", __LINE__);
+    PDL_Err err;
+    err = PDL_CallJS("dictInfoResult", (const char **)&buffer, 1);
+    if (err) {
+        syslog(LOG_ERR, "*** PDL_CallJS failed, %s", PDL_GetError());
+        //SDL_Delay(5);
+    }
+
+    // now that we're done, free our working memory
+    free(buffer);
 }
 
-static void output_result(TSearchResultList &res_list)
+static void query_result(TSearchResultList &res_list)
 {
     char *buffer;
     size_t bufferLength = 0;
@@ -90,7 +95,7 @@ static void output_result(TSearchResultList &res_list)
     fclose(f);
 
     // send data back to the JavaScript side
-    syslog(LOG_WARNING, "*** returning results");
+    syslog(LOG_WARNING, "%d return results", __LINE__);
     PDL_Err err;
     err = PDL_CallJS("dictQueryResult", (const char **)&buffer, 1);
     if (err) {
@@ -100,6 +105,27 @@ static void output_result(TSearchResultList &res_list)
 
     // now that we're done, free our working memory
     free(buffer);
+}
+
+static PDL_bool dictInfo(PDL_JSParameters *params)
+{
+    if (PDL_GetNumJSParams(params) != 0) {
+        syslog(LOG_INFO, "**** wrong number of parameters for dictInfo");
+        PDL_JSException(params, "wrong number of parameters for dictInfo");
+        return PDL_FALSE;
+    }
+
+    /* since we don't process this in the method thread, instead post a
+     * SDL event that will be received in the main thread and used to 
+     * launch the code. */
+    SDL_Event event;
+    event.user.type = SDL_USEREVENT;
+    event.user.code = 1;
+
+    syslog(LOG_WARNING, "*** sending dictInfo event");
+    SDL_PushEvent(&event);
+    
+    return PDL_TRUE;
 }
 
 static PDL_bool dictQuery(PDL_JSParameters *params)
@@ -144,18 +170,6 @@ int main(int argc, char *argv[])
     strlist_t dicts_dir_list;
     dicts_dir_list.push_back(data_dir);
 
-    // look for special -f switch to test getFiles from command line
-    if (!PDL_IsPlugin()) {
-        do_print_dict_info(dicts_dir_list);
-        return 0;
-    }
-    else {
-    }
-    
-    // register the js callback
-    PDL_RegisterJSHandler("dictQuery", dictQuery);
-    PDL_JSRegistrationComplete();
-
     // init the dict lib
     /* init the lib */
     Library lib;
@@ -163,6 +177,19 @@ int main(int argc, char *argv[])
     strlist_t empty_list, disable_list;
     lib.load(dicts_dir_list, empty_list, disable_list);
 
+    // look for special -f switch to test getFiles from command line
+    if (!PDL_IsPlugin()) {
+        return 0;
+    }
+    else {
+    }
+    
+    // register the js callback
+    PDL_RegisterJSHandler("dictQuery", dictQuery);
+    PDL_RegisterJSHandler("dictInfo", dictInfo);
+    PDL_JSRegistrationComplete();
+
+    openlog("com.xwteam.app.xwdict", 0, LOG_USER);
     // call a "ready" callback to let JavaScript know that we're initialized
     PDL_CallJS("ready", NULL, 0);
     syslog(LOG_INFO, "**** Registered");
@@ -173,18 +200,30 @@ int main(int argc, char *argv[])
         SDL_WaitEvent(&event);
         syslog(LOG_INFO, "**** SDL_WaitEvent returned with event type %d", event.type);
         
-        if (event.type == SDL_USEREVENT && event.user.code == 0) {
-            syslog(LOG_WARNING, "*** processing dictQuery event");
-            /* extract our arguments */
-            char *query = (char *)event.user.data1;
+        if (event.type == SDL_USEREVENT) {
+            switch (event.user.code) {
+                case 0:
+                    {
+                        syslog(LOG_WARNING, "*** processing dictQuery event");
+                        /* extract our arguments */
+                        char *query = (char *)event.user.data1;
 
-            /* find word */
-            TSearchResultList res_list;
-            lib.process_phrase(query, res_list);
-            output_result(res_list);
+                        /* find word */
+                        TSearchResultList res_list;
+                        lib.process_phrase(query, res_list);
+                        query_result(res_list);
 
-            /* free memory since this event is processed now */
-            free(query);
+                        /* free memory since this event is processed now */
+                        free(query);
+                    }
+                    break;
+                case 1:
+                    {
+                        syslog(LOG_WARNING, "*** processing dictInfo event");
+                        dict_info(lib);
+                    }
+                    break;
+            }
         }
         
     } while (event.type != SDL_QUIT);
