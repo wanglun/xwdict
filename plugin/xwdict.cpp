@@ -10,7 +10,8 @@
 using std::string;
 
 #define DICT_DIR    "res"
-static strlist_t dicts_dir_list;
+static strlist_t ifo_list;
+Library lib;
 
 /* Ouput the C string to a FILE in a fully-escaped version.  This should transparently
  * handle UTF-8 character because the multi-byte characters always have the high bit set
@@ -45,47 +46,42 @@ static void fputs_json(const char *s, FILE *f)
     fputc('\"', f);
 }
 
-/******************** to JS Layer********************/
-// json FILE
-FILE *json_f = NULL;
-
-struct PrintDictInfo {
-	void operator()(const std::string& filename, bool) {
-		DictInfo dict_info;
-		if (dict_info.load_from_ifo_file(filename, false)) {
-            fputs("{ \"bookname\":", json_f);
-            fputs_json(dict_info.bookname.c_str(), json_f);
-            fprintf(json_f, ", \"wordcount\":%d, author:", dict_info.wordcount);
-            fputs_json(dict_info.author.c_str(), json_f);
-            fputs(", date:", json_f);
-            fputs_json(dict_info.date.c_str(), json_f);
-            fputs(", description:", json_f);
-            fputs_json(dict_info.description.c_str(), json_f);
-            fputs("},", json_f);
-		}
+struct PushIfoFile {
+	void operator()(const std::string& filename) {
+        ifo_list.push_back(filename);
 	}
 };
 
+/******************** to JS Layer********************/
 static void dict_info(Library &lib)
 {
     int i = 0;
+    FILE *f = NULL;
     char *buffer;
     size_t bufferLength = 0;
     // output the file listing to our memory buffer, fclose will flush changes
-    json_f = open_memstream(&buffer, &bufferLength);
+    f = open_memstream(&buffer, &bufferLength);
 
-    size_t dict_count = lib.ndicts();
+    fputs("[", f);
 
-    fputs("[", json_f);
+    DictInfo dict_info;
+    List::const_iterator it;
+    for(it = ifo_list.begin(); it != ifo_list.end(); ++it) {
+        if (dict_info.load_from_ifo_file(*it, false)) {
+            fputs("{ \"bookname\":", f);
+            fputs_json(dict_info.bookname.c_str(), f);
+            fprintf(f, ", \"wordcount\":%d, author:", dict_info.wordcount);
+            fputs_json(dict_info.author.c_str(), f);
+            fputs(", date:", f);
+            fputs_json(dict_info.date.c_str(), f);
+            fputs(", description:", f);
+            fputs_json(dict_info.description.c_str(), f);
+            fputs("},", f);
+        }
+    }
 
-    PrintDictInfo print_dict_info;
-    strlist_t order_list, disable_list;
-    for_each_file(dicts_dir_list, ".ifo",  order_list, 
-            disable_list, print_dict_info); 
-
-    fputs("]", json_f);
-    fclose(json_f);
-    json_f = NULL;
+    fputs("]", f);
+    fclose(f);
 
     // send data back to the JavaScript side
     syslog(LOG_WARNING, "%d return dictinfo", __LINE__);
@@ -179,6 +175,50 @@ static PDL_bool dictQuery(PDL_JSParameters *params)
     return PDL_TRUE;
 }
 
+static PDL_bool dictConfig(PDL_JSParameters *params)
+{
+    if (PDL_GetNumJSParams(params) != 3) {
+        syslog(LOG_INFO, "**** wrong number of parameters for dictQuery");
+        PDL_JSException(params, "wrong number of parameters for dictQuery");
+        return PDL_FALSE;
+    }
+
+    /* parameters are directory, pattern */
+    int fuzzy = PDL_GetJSParamInt(params, 0);
+    int regex = PDL_GetJSParamInt(params, 1);
+    int data = PDL_GetJSParamInt(params, 2);
+    /* set configs */
+    lib.SetFuzzy((bool)fuzzy);
+    lib.SetRegex((bool)regex);
+    lib.SetData((bool)data);
+
+    syslog(LOG_WARNING, "*** set dict config");
+    
+    return PDL_TRUE;
+}
+
+static PDL_bool pushDict(PDL_JSParameters *params)
+{
+    if (PDL_GetNumJSParams(params) != 3) {
+        syslog(LOG_INFO, "**** wrong number of parameters for dictQuery");
+        PDL_JSException(params, "wrong number of parameters for dictQuery");
+        return PDL_FALSE;
+    }
+
+    /* parameters are directory, pattern */
+    int fuzzy = PDL_GetJSParamInt(params, 0);
+    int regex = PDL_GetJSParamInt(params, 1);
+    int data = PDL_GetJSParamInt(params, 2);
+    /* set configs */
+    lib.SetFuzzy((bool)fuzzy);
+    lib.SetRegex((bool)regex);
+    lib.SetData((bool)data);
+
+    syslog(LOG_WARNING, "*** set dict config");
+    
+    return PDL_TRUE;
+}
+
 int main(int argc, char *argv[])
 {
     // Initialize the SDL library with the Video subsystem
@@ -192,18 +232,17 @@ int main(int argc, char *argv[])
     PDL_Init(0);
 
     /* dict dirs */
+    static strlist_t dicts_dir_list;
     dicts_dir_list.push_back(DICT_DIR);
 
+    /* push the ifo files */
+    for_each_file(dicts_dir_list, ".ifo", PushIfoFile());
+
     // init the dict lib
-    /* init the lib */
-    Library lib;
-    /* set configs */
-    lib.SetFuzzy(true);
-    lib.SetRegex(false);
-    lib.SetData(false);
     /* load the dicts */
-    strlist_t empty_list, disable_list;
-    lib.load(dicts_dir_list, empty_list, disable_list);
+    strlist_t dict_list;
+    dict_list.push_back(ifo_list.front());
+    lib.load(dict_list);
 
     // look for special -f switch to test getFiles from command line
     if (!PDL_IsPlugin()) {
@@ -215,6 +254,7 @@ int main(int argc, char *argv[])
     // register the js callback
     PDL_RegisterJSHandler("dictQuery", dictQuery);
     PDL_RegisterJSHandler("dictInfo", dictInfo);
+    PDL_RegisterJSHandler("dictConfig", dictConfig);
     PDL_JSRegistrationComplete();
 
     openlog("com.xwteam.app.xwdict", 0, LOG_USER);

@@ -126,12 +126,8 @@ public:
     Libs(progress_func_t f=NULL);
     ~Libs();
     void load_dict(const std::string& url);
-    void load(const strlist_t& dicts_dirs,
-              const strlist_t& order_list,
-              const strlist_t& disable_list);
-    void reload(const strlist_t& dicts_dirs,
-                const strlist_t& order_list,
-                const strlist_t& disable_list);
+    void load(const strlist_t& order_list);
+    void reload(const strlist_t& order_list);
 
     glong narticles(int idict) { return oLib[idict]->narticles(); }
     const std::string& dict_name(int idict) { return oLib[idict]->dict_name(); }
@@ -160,6 +156,7 @@ public:
     bool LookupData(const gchar *sWord, std::vector<gchar *> *reslist);
 
     query_t analyze_query(const char *s, std::string& res);
+
     // for configs
     void SetFuzzy(bool enable) {
         config.fuzzy_lookup = enable;

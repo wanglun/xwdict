@@ -914,24 +914,12 @@ void Libs::load_dict(const std::string& url)
         delete lib;
 }
 
-class DictLoader
+void Libs::load(const strlist_t& order_list)
 {
-public:
-    DictLoader(Libs& lib_): lib(lib_) {}
-    void operator()(const std::string& url, bool disable) {
-        if(!disable)
-            lib.load_dict(url);
+    List::const_iterator it;
+    for(it=order_list.begin(); it!=order_list.end(); ++it) {
+        load_dict(*it);
     }
-private:
-    Libs& lib;
-};
-
-void Libs::load(const strlist_t& dicts_dirs,
-                const strlist_t& order_list,
-                const strlist_t& disable_list)
-{
-    for_each_file(dicts_dirs, ".ifo", order_list, disable_list,
-                  DictLoader(*this));
 }
 
 class DictReLoader
@@ -940,14 +928,12 @@ public:
     DictReLoader(std::vector<Dict *> &p, std::vector<Dict *> &f,
                  Libs& lib_) : prev(p), future(f), lib(lib_) {
     }
-    void operator()(const std::string& url, bool disable) {
-        if(!disable) {
-            Dict *dict=find(url);
-            if(dict)
-                future.push_back(dict);
-            else
-                lib.load_dict(url);
-        }
+    void operator()(const std::string& url) {
+        Dict *dict=find(url);
+        if(dict)
+            future.push_back(dict);
+        else
+            lib.load_dict(url);
     }
 private:
     std::vector<Dict *> &prev;
@@ -968,14 +954,15 @@ private:
     }
 };
 
-void Libs::reload(const strlist_t& dicts_dirs,
-                  const strlist_t& order_list,
-                  const strlist_t& disable_list)
+void Libs::reload(const strlist_t& order_list)
 {
     std::vector<Dict *> prev(oLib);
     oLib.clear();
-    for_each_file(dicts_dirs, ".ifo", order_list, disable_list,
-                  DictReLoader(prev, oLib, *this));
+    DictReLoader reLoader(prev, oLib, *this);
+    List::const_iterator it;
+    for(it=order_list.begin(); it!=order_list.end(); ++it) {
+        reLoader(*it);
+    }
     for(std::vector<Dict *>::iterator it=prev.begin(); it!=prev.end(); ++it)
         delete *it;
 }

@@ -68,27 +68,41 @@ enyo.kind({
 			// if not on device, return mock data
 			enyo.nextTick(this, function() { callback("test result"); });
 		}
-	}
+	},
+
+    dictConfig: function(config) {
+        console.error("plugin: dictConfig");
+        this.callPluginMethodDeferred(enyo.nop, "dictConfig", config['fuzzy'], config['regex'], config['data']);
+    }
 });
 
 enyo.kind({
-	name: "XwDictApp",
+	name: "mainView",
 	kind: "VFlexBox",
 	components: [
 		{kind: XwDictPlugin, name: "plugin"},
-		{kind: "PageHeader",
+		{kind: enyo.Toolbar, className:"enyo-toolbar-light accounts-header", pack:"center",
             components: [
-            {kind: "Input", name: "word", className: "search-input", inputClassName: "search-input-input", focusClassName: "search-input-focus", oninput: "wordChange", hint: "Please input word", flex: 1},
+			{ kind: "Image", src: "searchpreference_48x48.png"},
+            { kind: "Input", name: "word", className: "search-input", inputClassName: "search-input-input", focusClassName: "search-input-focus", oninput: "wordChange", hint: "Please input word", flex: 1},
 			]
         },
         {kind: "Scroller", flex: 1, components: [
-            {name: "result", content: "", allowHtml: true}]}
+            {name: "result", content: "", allowHtml: true}]},
 	],
 	word: "",
     dicts: "",
 	
 	create: function() {
 		this.inherited(arguments);
+
+        // set configs
+        var fuzzy = enyo.getCookie('fuzzy') || 0;
+        var regex = enyo.getCookie('regex') || 0;
+        var data = enyo.getCookie('data') || 0;
+        var config = {'fuzzy': fuzzy, 'regex': regex, 'data': data};
+        this.$.plugin.dictConfig(config);
+
         this.$.plugin.dictInfo(enyo.bind(this, 
                 function(info) {
                     this.dicts = info;
@@ -97,7 +111,12 @@ enyo.kind({
                 }
                 ));
 	},
-	
+
+    ler: function() {
+        console.error("keydown hanlder");
+        this.$.word.forceFocus();
+    },
+
 	doQuery: function() {
 		this.$.plugin.dictQuery(this.word, enyo.bind(this, this.showResult));
 	},
@@ -124,4 +143,79 @@ enyo.kind({
             }
         }
 	}
+});
+
+enyo.kind({
+	name: "preferencesView",
+	kind: "VFlexBox",
+    className: "basic-back",
+	components: [
+		{kind: "PageHeader",
+            components: [{content: $L("Preferences")}]
+        },
+        {kind: "Control", flex: 1, components: [
+            {kind: "RowGroup", caption: $L("Content"), style: "margin-bottom: 10px", components: [
+                {kind: "LabeledContainer", caption: $L("Fuzzy Search"), components: [
+                    {kind: "ToggleButton", name: "fuzzyToggle", onChange: "fuzzyToggleClick"}
+                ]},
+                {kind: "LabeledContainer", caption: $L("Regex Search"), components: [
+                    {kind: "ToggleButton", name: "regexToggle", onChange: "regexToggleClick"}
+                ]},
+                {kind: "LabeledContainer", caption: $L("Dict Mode"), components: [
+                    {kind: "ToggleButton", name: "dictModeToggle", onLabel: $L("Single"), offLabel: $L("Multi"), onChange: "dictModeToggleClick"}
+                ]},
+            ]},
+        ]}
+	],
+    fuzzyToggleClick: function() {
+    },
+    regexToggleClick: function() {
+    },
+    dictModeToggleClick: function() {
+    },
+});
+
+enyo.kind({
+    name: "XwDictApp",
+    kind: enyo.VFlexBox,
+    components: [
+        {kind: "ApplicationEvents", onBack: "backHandler", onKeydown: "keydown"},
+        {kind: enyo.Pane, name: "pane", transitionKind: "enyo.transitions.Simple", flex: 1, components: [
+                {kind: "mainView", name: "main"},
+                {kind: "preferencesView", name: "preferences", lazy: true},
+            ]
+        },
+        {kind: "AppMenu", name: "appMenu", components: [
+            {name: "preferencesItem", caption: $L("Preferences"), onclick: "selectPreferencesView"},
+        ]},
+    ],
+
+    selectPreferencesView: function() {
+        this.$.pane.selectViewByName("preferences");
+    },
+
+    keydown: function(inSender, e) {
+        console.error("keydown");
+    },
+
+    backHandler: function(inSender, e) {
+        var n = this.$.pane.getViewName();
+        switch (n) {
+            case 'main':
+                break;
+            case 'preferences':
+                this.$.pane.back(e);
+                break;
+        }
+    },
+
+	isMainShowing: function() {
+		return this.$.pane.getViewName() === "main";
+	},
+	isPreferencesShowing: function() {
+		return this.$.pane.getViewName() === "preferences";
+	},
+	toggleAppMenuItems: function() {
+		this.$.preferencesItem.setDisabled(this.isPreferencesShowing());
+	},
 });

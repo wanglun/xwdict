@@ -8,11 +8,11 @@
     margin-top: -15px;
 }
 .enyo-header {
-    height: 30px;
-    min-height: 30px;
+    height: 35px;
+    min-height: 35px;
 }
 .enyo-header-inner {
-    min-height: 30px;
+    min-height: 35px;
     padding: 2px;
     padding-left: 10px;
 }
