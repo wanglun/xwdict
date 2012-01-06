@@ -1,7 +1,3 @@
-@font-face {
-    font-family: MyFont;
-    src: url('myfont.ttf');
-}
 .search-input {
     border: none;
 }
@@ -41,7 +37,4 @@ ul.dict span {
 .word {
     color: #AAAA00;
     font-weight: bold;
-}
-.content {
-    font-family: MyFont;
 }
