@@ -36,7 +36,7 @@ static void fputs_json(const char *s, FILE *f)
                 case '\"': fputs("\\\"", f); break;
                 case '\b': fputs("\\b", f); break;
                 case '\f': fputs("\\f", f); break;
-                case '\n': fputs("\\n", f); break;
+                case '\n': fputs("<br/>", f); break;
                 case '\r': fputs("\\r", f); break;
                 case '\t': fputs("\\t", f); break;
                 default:   fprintf(f, "\\u%04x", ch); break;
@@ -70,11 +70,11 @@ static void dict_info(Library &lib)
         if (dict_info.load_from_ifo_file(*it, false)) {
             fputs("{ \"bookname\":", f);
             fputs_json(dict_info.bookname.c_str(), f);
-            fprintf(f, ", \"wordcount\":%d, author:", dict_info.wordcount);
+            fprintf(f, ", \"wordcount\":%d, \"author\":", dict_info.wordcount);
             fputs_json(dict_info.author.c_str(), f);
-            fputs(", date:", f);
+            fputs(", \"date\":", f);
             fputs_json(dict_info.date.c_str(), f);
-            fputs(", description:", f);
+            fputs(", \"description\":", f);
             fputs_json(dict_info.description.c_str(), f);
             fputs("},", f);
         }
@@ -199,22 +199,27 @@ static PDL_bool dictConfig(PDL_JSParameters *params)
 
 static PDL_bool pushDict(PDL_JSParameters *params)
 {
-    if (PDL_GetNumJSParams(params) != 3) {
+    if (PDL_GetNumJSParams(params) != 1) {
         syslog(LOG_INFO, "**** wrong number of parameters for dictQuery");
         PDL_JSException(params, "wrong number of parameters for dictQuery");
         return PDL_FALSE;
     }
 
     /* parameters are directory, pattern */
-    int fuzzy = PDL_GetJSParamInt(params, 0);
-    int regex = PDL_GetJSParamInt(params, 1);
-    int data = PDL_GetJSParamInt(params, 2);
-    /* set configs */
-    lib.SetFuzzy((bool)fuzzy);
-    lib.SetRegex((bool)regex);
-    lib.SetData((bool)data);
+    int index = PDL_GetJSParamInt(params, 0);
+    syslog(LOG_WARNING, "*** push dict %d", index);
 
-    syslog(LOG_WARNING, "*** set dict config");
+    // init the dict lib
+    /* load the dicts */
+    int i = 0;
+    List::const_iterator it;
+    strlist_t dict_list;
+    for (it = ifo_list.begin(); it != ifo_list.end(); ++it, i++) {
+        if (index & (0x1 << i)) {
+            dict_list.push_back(*it);
+        }
+    }
+    lib.reload(dict_list);
     
     return PDL_TRUE;
 }
@@ -238,12 +243,6 @@ int main(int argc, char *argv[])
     /* push the ifo files */
     for_each_file(dicts_dir_list, ".ifo", PushIfoFile());
 
-    // init the dict lib
-    /* load the dicts */
-    strlist_t dict_list;
-    dict_list.push_back(ifo_list.front());
-    lib.load(dict_list);
-
     // look for special -f switch to test getFiles from command line
     if (!PDL_IsPlugin()) {
         return 0;
@@ -255,6 +254,7 @@ int main(int argc, char *argv[])
     PDL_RegisterJSHandler("dictQuery", dictQuery);
     PDL_RegisterJSHandler("dictInfo", dictInfo);
     PDL_RegisterJSHandler("dictConfig", dictConfig);
+    PDL_RegisterJSHandler("pushDict", pushDict);
     PDL_JSRegistrationComplete();
 
     openlog("com.xwteam.app.xwdict", 0, LOG_USER);

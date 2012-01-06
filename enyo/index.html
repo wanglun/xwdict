@@ -6,6 +6,9 @@
 </head>
 <body>
 <script type="text/javascript">
+    // handle the AppMenu and onKeydown comflicts
+    enyo.PopupLayer.prototype.wantsEvents = false;
+
 	var xwdictApp = new XwDictApp().renderInto(document.body);
 </script>
 </body>

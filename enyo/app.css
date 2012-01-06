@@ -1,3 +1,7 @@
+@font-face {
+    font-family: MyFont;
+    src: url('myfont.ttf');
+}
 .search-input {
     border: none;
 }
@@ -15,4 +19,29 @@
     min-height: 35px;
     padding: 2px;
     padding-left: 10px;
+}
+ul.dict {
+    padding: 10px;
+    margin: 0px;
+    list-style: none;
+}
+ul.dict li {
+    margin-top: 10px;
+    float: left;
+    clear: both;
+}
+ul.dict span {
+    float: left;
+    clear: both;
+}
+.bookname {
+    color: #AA0000;
+    border-bottom: 2px solid #cccccc;
+}
+.word {
+    color: #AAAA00;
+    font-weight: bold;
+}
+.content {
+    font-family: MyFont;
 }

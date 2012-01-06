@@ -1,8 +1,3 @@
-/* FileTree app.js */
-
-/* Here, we create a specialization of enyo.Hybrid for our FileTree plugin.  This is done to simplify the API for
- * the user. */
-
 enyo.kind({
 	name: "XwDictPlugin",
 	kind: "enyo.Hybrid",
@@ -12,17 +7,12 @@ enyo.kind({
 
 	create: function() {
 		this.inherited(arguments);
-		// we create this as a deferred callback so we can call back into the
-		// plugin immediately
 		this.addCallback("dictQueryResult", enyo.bind(this, this._queryResultsCallback), true);
 		this.addCallback("dictInfoResult", enyo.bind(this, this._infoResultsCallback), true);
 	},
 	
 	_resultsCallbacks: [],
 	_queryResultsCallback: function(wordsJSON) {
-		console.error("***** FileTreePlugin: _getFilesResultsCallback");
-		// we rely on the fact that calls to the plugin will result in callbacks happening
-		// in the order that the calls were made to do a first-in, first-out queue
 		var callback = this._resultsCallbacks.shift();
 		if (callback) {
 			callback(enyo.json.parse(wordsJSON));
@@ -34,11 +24,7 @@ enyo.kind({
 
     _infoCallback: 0,
 	_infoResultsCallback: function(wordsJSON) {
-		console.error("plugin: dictinfo " + wordsJSON);
-		// we rely on the fact that calls to the plugin will result in callbacks happening
-		// in the order that the calls were made to do a first-in, first-out queue
 		if (this._infoCallback) {
-			//this._infoCallback(enyo.json.parse(wordsJSON));
 			this._infoCallback(wordsJSON);
 		}
 		else {
@@ -73,7 +59,12 @@ enyo.kind({
     dictConfig: function(config) {
         console.error("plugin: dictConfig");
         this.callPluginMethodDeferred(enyo.nop, "dictConfig", config['fuzzy'], config['regex'], config['data']);
-    }
+    },
+
+    pushDict: function(i) {
+        console.error("plugin: pushDict");
+        this.callPluginMethodDeferred(enyo.nop, "pushDict", i);
+    },
 });
 
 enyo.kind({
@@ -81,6 +72,7 @@ enyo.kind({
 	kind: "VFlexBox",
 	components: [
 		{kind: XwDictPlugin, name: "plugin"},
+        {kind: enyo.ApplicationEvents, onKeydown: "handleKeydown"},
 		{kind: enyo.Toolbar, className:"enyo-toolbar-light accounts-header", pack:"center",
             components: [
 			{ kind: "Image", src: "searchpreference_48x48.png"},
@@ -91,42 +83,84 @@ enyo.kind({
             {name: "result", content: "", allowHtml: true}]},
 	],
 	word: "",
-    dicts: "",
-	
+    dicts: [],
+
 	create: function() {
 		this.inherited(arguments);
 
         // set configs
-        var fuzzy = enyo.getCookie('fuzzy') || 0;
-        var regex = enyo.getCookie('regex') || 0;
-        var data = enyo.getCookie('data') || 0;
+        var fuzzy = enyo.getCookie('fuzzy') || 1;
+        var regex = enyo.getCookie('regex') || 1;
+        var data = enyo.getCookie('data') || 1;
         var config = {'fuzzy': fuzzy, 'regex': regex, 'data': data};
         this.$.plugin.dictConfig(config);
 
         this.$.plugin.dictInfo(enyo.bind(this, 
                 function(info) {
-                    this.dicts = info;
-                    console.error("dictInfo: " + this.dicts);
-                    this.$.result.setContent(this.dicts);
+                    this.dicts = enyo.json.parse(info);
+                    this.showHome();
+
+                    // push the dicts
+                    this.$.plugin.pushDict(7);
                 }
                 ));
 	},
 
-    ler: function() {
-        console.error("keydown hanlder");
-        this.$.word.forceFocus();
+    showHome: function() {
+        var info = "<ul class='dict'>";
+        var i, dict;
+        for (i = 0; i < this.dicts.length; i++) {
+            dict = this.dicts[i];
+            info += "<li><span class='bookname'>" + dict.bookname + "</span>";
+            info += "<span class='wordcount'>共收录条目: " + dict.wordcount + "条</span>";
+            info += "<span class='author'>作者: " + dict.author + "</span></li>";
+        }
+        info += "</ul>";
+        this.$.result.setContent(info);
     },
+
+	handleKeydown: function(s, e) {
+		if ( e.keyCode == 13 ) {
+            ;
+		} else {
+			if (!this.$.word.hasFocus()) {
+				this.$.word.forceFocus();			
+				
+				if (e.keyCode === 8) {
+					var curVal = this.$.word.getValue();
+					if (curVal.length > 0) {
+						this.$.word.setValue(curVal.slice(0, -1));
+						enyo.asyncMethod(this, "doSearch");
+					}
+				} else {
+					var keyEvent = Utils.keyFromEvent(e);
+					if (keyEvent) {
+						this.$.word.setValue(this.$.word.getValue() + keyEvent);
+						enyo.asyncMethod(this, "doSearch");
+					}
+				}
+			} else {
+                enyo.asyncMethod(this, "doSearch");
+			}
+			
+		}
+	},
 
 	doQuery: function() {
 		this.$.plugin.dictQuery(this.word, enyo.bind(this, this.showResult));
 	},
 	
 	showResult: function(result) {
-        var output_result = "";
+        var r;
+        var out = "<ul class='dict'>";
         for (var i = 0; i < result.length; i++) {
-            output_result += result[i].dict + "<br/>" + result[i].word + "<br/>" + enyo.string.escapeHtml(result[i].data);
+            r = result[i];
+            out += "<li><span class='bookname'>" + r.dict + "</span>";
+            out += "<span class='word'>" + r.word + "</span>";
+            out += "<span class='content'>" + r.data + "</span></li>";
         }
-        this.$.result.setContent(output_result);
+        out += "</ul>";
+        this.$.result.setContent(out);
 	},
 
     wordChange: function() {
@@ -137,7 +171,7 @@ enyo.kind({
         if (this.word !== this.$.word.getValue()) {
             this.word = this.$.word.getValue();
             if (this.$.word.isEmpty()) {
-                this.showResult('');
+                this.showHome();
             } else {
                 this.doQuery();
             }
@@ -179,8 +213,8 @@ enyo.kind({
     name: "XwDictApp",
     kind: enyo.VFlexBox,
     components: [
-        {kind: "ApplicationEvents", onBack: "backHandler", onKeydown: "keydown"},
-        {kind: enyo.Pane, name: "pane", transitionKind: "enyo.transitions.Simple", flex: 1, components: [
+        {kind: "ApplicationEvents", onBack: "handleBack"},
+        {kind: enyo.Pane, name: "pane", flex: 1, components: [
                 {kind: "mainView", name: "main"},
                 {kind: "preferencesView", name: "preferences", lazy: true},
             ]
@@ -194,11 +228,7 @@ enyo.kind({
         this.$.pane.selectViewByName("preferences");
     },
 
-    keydown: function(inSender, e) {
-        console.error("keydown");
-    },
-
-    backHandler: function(inSender, e) {
+    handleBack: function(s, e) {
         var n = this.$.pane.getViewName();
         switch (n) {
             case 'main':
