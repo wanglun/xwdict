@@ -1,5 +1,6 @@
 .search-input {
     border: none;
+    margin-left: 20px;
 }
 .search-input-focus {
 }
@@ -37,4 +38,8 @@ ul.dict span {
 .word {
     color: #AAAA00;
     font-weight: bold;
+}
+.content {
+    font-family: "Lucida Sans Unicode";
+    font-size: small;
 }

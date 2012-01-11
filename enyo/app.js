@@ -1,3 +1,9 @@
+var default_configs = {
+    fuzzy : 0,
+    regex : 0,
+    data : 0,
+};
+var dict_configs = {};
 enyo.kind({
 	name: "XwDictPlugin",
 	kind: "enyo.Hybrid",
@@ -58,7 +64,7 @@ enyo.kind({
 
     dictConfig: function(config) {
         console.error("plugin: dictConfig");
-        this.callPluginMethodDeferred(enyo.nop, "dictConfig", config['fuzzy'], config['regex'], config['data']);
+        this.callPluginMethodDeferred(enyo.nop, "dictConfig", config.fuzzy, config.regex, config.data);
     },
 
     pushDict: function(i) {
@@ -75,7 +81,7 @@ enyo.kind({
         {kind: enyo.ApplicationEvents, onKeydown: "handleKeydown"},
 		{kind: enyo.Toolbar, className:"enyo-toolbar-light accounts-header", pack:"center",
             components: [
-			{ kind: "Image", src: "searchpreference_48x48.png"},
+			{ kind: "Image", src: "images/search.png"},
             { kind: "Input", name: "word", className: "search-input", inputClassName: "search-input-input", focusClassName: "search-input-focus", oninput: "wordChange", hint: "Please input word", flex: 1},
 			]
         },
@@ -89,11 +95,8 @@ enyo.kind({
 		this.inherited(arguments);
 
         // set configs
-        var fuzzy = enyo.getCookie('fuzzy') || 1;
-        var regex = enyo.getCookie('regex') || 1;
-        var data = enyo.getCookie('data') || 1;
-        var config = {'fuzzy': fuzzy, 'regex': regex, 'data': data};
-        this.$.plugin.dictConfig(config);
+        dict_configs = enyo.getCookie("configs") && enyo.json.parse(enyo.cookie.getCookie("configs")) || default_configs;
+        this.$.plugin.dictConfig(dict_configs);
 
         this.$.plugin.dictInfo(enyo.bind(this, 
                 function(info) {
@@ -202,10 +205,15 @@ enyo.kind({
         ]}
 	],
     fuzzyToggleClick: function() {
+        dict_configs.fuzzy = this.$.fuzzyToggle.getState();
+        this.$.plugin.dictConfig(dict_configs);
     },
     regexToggleClick: function() {
+        dict_configs.regex = this.$.regexToggle.getState();
+        this.$.plugin.dictConfig(dict_configs);
     },
     dictModeToggleClick: function() {
+        ;
     },
 });
 
