@@ -9,7 +9,7 @@
 
 using std::string;
 
-#define DICT_DIR    "res"
+#define DICT_DIR    "/media/internal/xwdict"
 static strlist_t ifo_list;
 Library lib;
 
