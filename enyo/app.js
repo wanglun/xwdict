@@ -10,6 +10,7 @@ enyo.kind({
 	width: 0,
 	height: 0,
 	executable: "xwdict_plugin",
+    cachePlugin: true,
 
 	create: function() {
 		this.inherited(arguments);
@@ -206,11 +207,9 @@ enyo.kind({
 	],
     fuzzyToggleClick: function() {
         dict_configs.fuzzy = this.$.fuzzyToggle.getState();
-        this.$.plugin.dictConfig(dict_configs);
     },
     regexToggleClick: function() {
         dict_configs.regex = this.$.regexToggle.getState();
-        this.$.plugin.dictConfig(dict_configs);
     },
     dictModeToggleClick: function() {
         ;
